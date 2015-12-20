@@ -26,6 +26,7 @@ var Log = require('../lib/logger'),
     utils = require('../lib/utils'),
     Server = require('../lib/server').Server,
     Tunnel = require('../lib/local').Tunnel,
+    LocalTunnel = require('../lib/localtunnel').Tunnel,
     tunnel = require('tunnel'),
     http = require('http'),
     ConfigParser = require('../lib/configParser').ConfigParser,
@@ -85,11 +86,18 @@ function cleanUpAndExit(signal, status) {
     statusPoller.stop();
   }
 
-  try {
-    process.kill(tunnel.process.pid, 'SIGKILL');
-  } catch (e) {
-    logger.debug('Non existent tunnel');
+  if (tunnel) {
+    if (tunnel.process) {
+      try {
+        process.kill(tunnel.process.pid, 'SIGKILL');
+      } catch (e) {
+        logger.debug('Non existent tunnel');
+      }
+    } else if (typeof tunnel.close === 'function') {
+      tunnel.close();
+    }
   }
+
   try {
     fs.unlinkSync(pid_file);
   } catch (e) {
@@ -118,7 +126,7 @@ function getTestBrowserInfo(browserString, path) {
 
 
 function buildTestUrl(test_path, worker_key, browser_string) {
-  var url = 'http://localhost:' + serverPort + '/' + test_path;
+  var url = (tunnel.url ? tunnel.url : ('http://localhost:' + serverPort)) + '/' + test_path;
 
   var querystring = qs.stringify({
     _worker_key: worker_key,
@@ -350,10 +358,13 @@ function runTests() {
       return oldhttpreq.call(null, options, callback);
     };
   }
+
   if (config.browsers && config.browsers.length > 0) {
     ConfigParser.parse(client, config.browsers, function(browsers){
       launchServer();
-      tunnel = new Tunnel(config.key, serverPort, config.tunnelIdentifier, function () {
+
+      var TunnelImpl = (config.localtunnel !== true) ? Tunnel : LocalTunnel;
+      tunnel = new TunnelImpl(config.key, serverPort, config.tunnelIdentifier, function () {
         statusPoller.start();
         var total_runs = config.browsers.length * (Array.isArray(config.test_path) ? config.test_path.length : 1);
         logger.info('Launching ' + config.browsers.length + ' worker(s) for ' + total_runs + ' run(s).');
