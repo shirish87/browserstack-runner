@@ -3,10 +3,12 @@
 var todo = process.argv[2];
 
 if (todo === '--verbose') {
-  global.logLevel = process.env.LOG_LEVEL || 'debug';
+  global.logLevel = 'debug';
 } else {
   global.logLevel = 'info';
 }
+
+global.logLevel = process.env.BROWSERSTACK_LOG_LEVEL || global.logLevel;
 
 if (todo === 'init') {
   require('./init.js');
