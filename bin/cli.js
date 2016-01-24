@@ -51,9 +51,7 @@ function terminateAllWorkers(callback) {
       var worker = workers[key];
       if(worker) {
         logger.debug('[%s] Terminated', worker.string);
-        clearTimeout(worker.ackTimeout);
-        clearTimeout(worker.activityTimeout);
-        clearTimeout(worker.testActivityTimeout);
+        worker.resetTimers();
         delete workers[key];
         delete workerKeys[worker.id];
       }
@@ -240,52 +238,83 @@ function attachWorkerHelpers(worker) {
     return info;
   };
 
-  worker.awaitAck = function awaitAck() {
-    var self = this;
+  attachWorkerTimers(worker);
+  return worker;
+}
 
-    if (this.ackTimeout) {
-      logger.trace('[%s] worker.awaitAck: already awaiting ack, or awaited ack once and failed', self.id);
+
+function attachWorkerTimers(worker) {
+  worker._timers = {
+    launch: {
+      timeout: ackTimeout * 1000
+    },
+    load: {
+      timeout: ackTimeout * 1000
+    }
+  };
+
+  worker.startTimer = function startTimer(timerType, timeout) {
+    var workerId = this.id;
+
+    if (this._timers[timerType] && this._timers[timerType].timer) {
+      logger.trace('[%s] worker.%s: timer already active', workerId, timerType);
       return;
     }
 
-    logger.trace('[%s] worker.awaitAck: timeout in %d secs', self.id, ackTimeout);
+    this._timers[timerType] = this._timers[timerType] || {};
+    var timerState = this._timers[timerType];
 
-    this.ackTimeout = setTimeout(function () {
-      if (self.isAckd) {
-        logger.trace('[%s] worker.awaitAck: already ackd', self.id);
-        return;
-      }
+    if (!isNaN(timeout)) {
+      logger.trace('[%s] worker.%s: timeout in %d secs', workerId, timerType, timeout / 1000);
+      timerState.timeout = timerState.timeout || timeout;
+    }
 
+    var browserInfo = this.getTestBrowserInfo();
+    var self = this;
+
+    timerState.reloadAttempts = timerState.reloadAttempts || 0;
+
+    timerState.timer = setTimeout(function () {
       var url = self.buildUrl();
-      logger.trace('[%s] worker.awaitAck: client.changeUrl: %s', self.id, url);
+      logger.trace('[%s] worker.%s: client.changeUrl: %s', workerId, timerType, url);
+
+      timerState.reloadAttempts++;
 
       client.changeUrl(self.id, { url: url }, function (err, data) {
-        logger.trace('[%s] worker.awaitAck: client.changeUrl: %s | response:', self.id, url, data, err);
-        logger.debug('[%s] Sent Request to reload url', self.getTestBrowserInfo());
+        logger.trace('[%s] worker.%s: client.changeUrl: %s | response:', workerId, timerType, url, data, err);
+        logger.debug('[%s] Sent Request to reload url', browserInfo);
       });
 
-    }, ackTimeout * 1000);
+    }, timerState.timeout);
 
-    logger.debug('[%s] Awaiting ack', this.getTestBrowserInfo());
+    logger.debug('[%s] Awaiting %s ack', browserInfo, timerType);
   };
 
-  worker.markAckd = function markAckd() {
-    this.resetAck();
-    this.isAckd = true;
-
-    logger.trace('[%s] worker.markAckd', this.id);
-    logger.debug('[%s] Received ack', this.getTestBrowserInfo());
+  worker.isTimerActive = function isTimerActive(timerType) {
+    return (this._timers[timerType] && this._timers[timerType].timer);
   };
 
-  worker.resetAck = function resetAck() {
-    logger.trace('[%s] worker.resetAck', this.id);
-
-    clearTimeout(this.ackTimeout);
-    this.ackTimeout = null;
-    this.isAckd = false;
+  worker.stopTimer = function stopTimer(timerType) {
+    this.resetTimer(timerType);
   };
 
-  return worker;
+  worker.resetTimer = function resetTimer(timerType) {
+    if (this._timers[timerType] && this._timers[timerType].timer) {
+      clearTimeout(this._timers[timerType].timer);
+    }
+
+    this._timers[timerType].timer = null;
+    this._timers[timerType].reloadAttempts = 0;
+  };
+
+  worker.resetTimers = function resetTimers() {
+    var timerTypes = Object.keys(this._timers || {});
+
+    if (timerTypes.length) {
+      timerTypes.map(this.resetTimer.bind(this));
+    }
+  };
+
 }
 
 
@@ -318,64 +347,9 @@ var statusPoller = {
             worker.launched = true;
             workerData.marked = true;
 
-            // Await ack from browser-worker
-            worker.awaitAck();
-            logger.trace('[%s] worker.activityTimeout: timeout in %d secs', worker.id, activityTimeout);
-
-            worker.activityTimeout = setTimeout(function () {
-              if (!worker.isAckd) {
-                logger.trace('[%s] worker.activityTimeout', worker.id);
-
-                var subject = 'Worker inactive for too long: ' + worker.string;
-                var content = 'Worker details:\n' + JSON.stringify(worker.config, null, 4);
-                utils.alertBrowserStack(subject, content, null, function(){});
-                delete workers[workerData.key];
-                delete workerKeys[worker.id];
-                config.status += 1;
-                if (utils.objectSize(workers) === 0) {
-                  var color = config.status > 0 ? 'red' : 'green';
-                  logger.info(chalk[color]('All tests done, failures: %d.'), config.status);
-
-                  if (config.status > 0) {
-                    config.status = 1;
-                  }
-
-                  logger.trace('[%s] worker.activityTimeout: all tests done', worker.id, config.status && 'with failures');
-                  process.exit('SIGTERM');
-                }
-              } else {
-                logger.trace('[%s] worker.activityTimeout: already ackd', worker.id);
-              }
-            }, activityTimeout * 1000);
-
-
-            logger.trace('[%s] worker.testActivityTimeout: timeout in %d secs', worker.id, activityTimeout);
-
-            worker.testActivityTimeout = setTimeout(function () {
-              if (worker.isAckd) {
-                logger.trace('[%s] worker.testActivityTimeout', worker.id);
-
-                var subject = 'Tests timed out on: ' + worker.string;
-                var content = 'Worker details:\n' + JSON.stringify(worker.config, null, 4);
-                utils.alertBrowserStack(subject, content, null, function(){});
-                delete workers[workerData.key];
-                delete workerKeys[worker.id];
-                config.status += 1;
-                if (utils.objectSize(workers) === 0) {
-                  var color = config.status > 0 ? 'red' : 'green';
-                  logger.info(chalk[color]('All tests done, failures: %d.'), config.status);
-
-                  if (config.status > 0) {
-                    config.status = 1;
-                  }
-
-                  logger.trace('[%s] worker.testActivityTimeout: all tests done', worker.id, config.status && 'with failures');
-                  process.exit('SIGTERM');
-                }
-              } else {
-                logger.trace('[%s] worker.testActivityTimeout: not ackd', worker.id);
-              }
-            }, (activityTimeout * 1000));
+            if (!worker.isTimerActive('launch') && !worker._launched) {
+              worker.startTimer('launch');
+            }
           }
         });
       });
