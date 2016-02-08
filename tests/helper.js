@@ -94,8 +94,6 @@ function runTests(runnerPath, projectDir, conf, expectedResults, callback) {
 
     console.log('Running tests:', projectDir);
     runCommand(runnerPath, [], true, function (data, done) {
-      console.log('>', data);
-
       if (data && data.length) {
         var matches = data.match(/\[(.*)\] (passed|failed): (\d+) tests, (\d+) passed, (\d+) failed/i);
         if (matches && matches.length > 5) {
@@ -104,6 +102,8 @@ function runTests(runnerPath, projectDir, conf, expectedResults, callback) {
           [ 'failed', 'passed', 'tests' ].forEach(function (k) {
             results[k] += parseInt(matches.pop());
           });
+
+          console.log('>', data);
         }
       }
 
