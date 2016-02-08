@@ -1,5 +1,6 @@
 
 var exec = require('child_process').execFile;
+var execSync = require('child_process').execFileSync;
 var fs = require('fs');
 var path = require('path');
 var util = require('util');
@@ -69,6 +70,23 @@ function gitCloneByBranch(repository, branch, url, callback) {
   });
 }
 
+function initRepository() {
+  try {
+    execSync('npm', [ 'install' ]);
+  } catch (e) {
+    console.error(e.message || e.toString());
+  }
+
+  try {
+    var stat = fs.lstatSync('bower.json');
+    if (stat && stat.isFile()) {
+      execSync('bower', [ 'install' ]);
+    }
+  } catch (e) {
+    console.warn(e.message || e.toString());
+  }
+}
+
 function runTests(runnerPath, projectDir, conf, expectedResults, callback) {
   var results = {
     tests: 0,
@@ -82,6 +100,8 @@ function runTests(runnerPath, projectDir, conf, expectedResults, callback) {
   } catch (e) {
     return callback('Error switching to project directory: ' + e);
   }
+
+  initRepository();
 
   var confPath = path.join(process.cwd(), 'browserstack.json');
   var confString = JSON.stringify(conf, null, 4);
