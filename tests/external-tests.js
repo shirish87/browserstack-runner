@@ -15,6 +15,7 @@ var repositories = [
     name: 'mocha',
     tag: '1.21.5',
     url: 'https://github.com/mochajs/mocha.git',
+    test_framework: 'mocha',
     browsers: [
       {
         browser: 'chrome',
@@ -38,6 +39,7 @@ var repositories = [
     name: 'mocha',
     tag: '2.4.5',
     url: 'https://github.com/mochajs/mocha.git',
+    test_framework: 'mocha',
     browsers: [
       {
         browser: 'chrome',
