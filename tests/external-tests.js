@@ -57,9 +57,59 @@ var repositories = [
       'test/browser/ui.html'
     ],
     expected_results: {
-      tests: 118,
-      passed: 108,
-      failed: 10
+      tests: 229,
+      passed: 206,
+      failed: 23
+    }
+  },
+  {
+    name: 'qunit',
+    tag: 'v1.0.0',
+    url: 'https://github.com/jquery/qunit.git',
+    test_framework: 'qunit',
+    browsers: [
+      {
+        "browser_version": "44.0",
+        "os_version": "Snow Leopard",
+        "browser": "firefox",
+        "os": "OS X",
+        "device": null
+      }
+    ],
+    test_path: [
+      'test/index.html',
+      'test/logs.html'
+    ],
+    expected_results: {
+      tests: 606,
+      passed: 606,
+      failed: 0
+    }
+  },
+  {
+    name: 'qunit',
+    tag: '1.21.0',
+    url: 'https://github.com/jquery/qunit.git',
+    test_framework: 'qunit',
+    browsers: [
+      {
+        "browser_version": "44.0",
+        "os_version": "El Capitan",
+        "browser": "firefox",
+        "os": "OS X",
+        "device": null
+      }
+    ],
+    test_path: [
+      'test/autostart.html',
+      'test/index.html',
+      'test/logs.html',
+      'test/startError.html'
+    ],
+    expected_results: {
+      tests: 590,
+      passed: 590,
+      failed: 0
     }
   }
 ];
@@ -80,5 +130,9 @@ function run(repositories, callback) {
 }
 
 run(repositories, function (err) {
-  console.log(err || 'Done.');
+  if (err) {
+    throw err;
+  }
+
+  console.log('Done.');
 });
