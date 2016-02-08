@@ -30,14 +30,14 @@ var repositories = [
       'test/browser/opts.html'
     ],
     expected_results: {
-      tests: 32,
-      passed: 30,
-      failed: 2
+      tests: 100,
+      passed: 92,
+      failed: 8
     }
   },
   {
     name: 'mocha',
-    tag: '2.4.5',
+    tag: 'v2.4.5',
     url: 'https://github.com/mochajs/mocha.git',
     test_framework: 'mocha',
     browsers: [
