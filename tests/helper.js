@@ -36,6 +36,9 @@ function runRepository(testHome, runnerPath, repository, conf, callback) {
     var projectPath = path.resolve(path.join(repository.name + '-' + repository.branch));
     conf.test_framework = repository.test_framework;
     conf.browsers = repository.browsers;
+    conf.project = repository.name;
+    conf.build = repository.branch;
+
     conf.test_path = conf.test_path || [];
     (repository.test_path || []).forEach(function (p) {
       conf.test_path.push(p);
