@@ -221,7 +221,7 @@ function runCommand(cmd, args, ignoreErr, processOutputHook, callback) {
 
   var processOutput = function (isError) {
     return function (data) {
-      processOutputHook(data, function (isDone) {
+      processOutputHook(data.toString(), function (isDone) {
         if (isDone) {
           isError ? callbackOnce(new Error(data)) : callbackOnce(null, data);
         }
